@@ -1197,14 +1197,15 @@ print(f'  Saved: Selieri_v2.docx')
 print('\n' + '=' * 62)
 print('  COMPLETE')
 print('=' * 62)
+sep = '=' * 62
 print(f'''
-  ┌─────────────────────────────────────────────────────────┐
-  │  Model          Features   Game AUC   Game F1   Epochs  │
-  ├─────────────────────────────────────────────────────────┤
-  │  A1 Per-Move    SF+Maia    {res_A1["game_auc"]:.4f}    {res_A1["game_f1"]:.4f}    {len(hist_A1["tr_loss"]):3d}   │
-  │  A2 Per-Move    SF-only    {res_A2["game_auc"]:.4f}    {res_A2["game_f1"]:.4f}    {len(hist_A2["tr_loss"]):3d}   │
-  │  B1 Per-Game    SF+Maia    {res_B1["auc"]:.4f}    {res_B1["f1"]:.4f}    {len(hist_B1["tr_loss"]):3d}   │
-  │  B2 Per-Game    SF-only    {res_B2["auc"]:.4f}    {res_B2["f1"]:.4f}    {len(hist_B2["tr_loss"]):3d}   │
-  └─────────────────────────────────────────────────────────┘
+  {sep}
+  Model          Features   Game AUC   Game F1   Epochs
+  {sep}
+  A1 Per-Move    SF+Maia    {res_A1["game_auc"]:.4f}    {res_A1["game_f1"]:.4f}    {len(hist_A1["tr_loss"]):3d}
+  A2 Per-Move    SF-only    {res_A2["game_auc"]:.4f}    {res_A2["game_f1"]:.4f}    {len(hist_A2["tr_loss"]):3d}
+  B1 Per-Game    SF+Maia    {res_B1["auc"]:.4f}    {res_B1["f1"]:.4f}    {len(hist_B1["tr_loss"]):3d}
+  B2 Per-Game    SF-only    {res_B2["auc"]:.4f}    {res_B2["f1"]:.4f}    {len(hist_B2["tr_loss"]):3d}
+  {sep}
   K&L Self-Influence ratio (cheat/clean): {abs(mean_cheat_si/mean_clean_si):.1f}x
 ''')
