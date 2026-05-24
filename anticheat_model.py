@@ -455,9 +455,31 @@ save_model(B2, f'{BASE}\\selieri_model_game_sfonly.pt',
            N_FEAT_SF, scaler_sf, SF_COLS, res_B2)
 print(f'  AUC={res_B2["auc"]:.4f}  F1={res_B2["f1"]:.4f}')
 
-# ─────────────────────────────────────────────────────────────────
-# 6. KOH & LIANG (2017) INFLUENCE FUNCTIONS  (on A1 — per-move full)
-# ─────────────────────────────────────────────────────────────────
+
+# =================================================================== #
+#                                                                     #
+#   EXPLAINABILITY — KOH & LIANG (2017) INFLUENCE FUNCTIONS          #
+#                                                                     #
+#   Applied to model A1 (per-move BiLSTM, SF + Maia features).       #
+#                                                                     #
+#   Core idea:                                                        #
+#     I(z_train, z_test) = -grad_L(z_test)^T * H^{-1} * grad_L(z_train)
+#     Negative score  -> proponent  (training game that *supports*    #
+#                         the model's suspicion of the test game)     #
+#     Positive score  -> opponent   (training game that *hurts* it)   #
+#                                                                     #
+#   H^{-1}v is approximated by LiSSA (Agarwal et al. 2017):          #
+#     h_k = v + (1-damping)*h_{k-1} - HVP(h_{k-1}) / scale          #
+#   Scope: classifier head only (16,513 params) — tractable on CPU.  #
+#                                                                     #
+#   Three outputs:                                                    #
+#     Step 1 — gradient vector for every training game  (1,400)      #
+#     Step 2 — influence matrix for 50 most suspicious test games     #
+#     Step 3 — self-influence I(z,z) for every training game          #
+#               (cheat games show ~5x higher self-influence)          #
+#                                                                     #
+# =================================================================== #
+
 print('\n' + '=' * 62)
 print('  EXPLAINABILITY: Koh & Liang (2017) — Applied to A1')
 print('=' * 62)
@@ -470,6 +492,7 @@ print(f'  Classifier head params: {n_params:,}')
 crit_inf = nn.BCEWithLogitsLoss(
     pos_weight=torch.tensor([pos_weight_move]), reduction='none')
 
+# --- per-example gradient helper ---
 def compute_example_grad(model, params, x, lengths, y):
     model.zero_grad()
     logits = model(x, lengths)
@@ -479,6 +502,7 @@ def compute_example_grad(model, params, x, lengths, y):
     grads  = torch.autograd.grad(loss, params, retain_graph=False)
     return torch.cat([g.detach().flatten() for g in grads]).numpy()
 
+# --- LiSSA: stochastic inverse-Hessian-vector product ---
 def lissa_ihvp(model, params, loader, test_grad,
                scale=25.0, damping=0.01, recursion_depth=100):
     """LiSSA approximation of H^{-1} * test_grad (Koh & Liang 2017, Agarwal et al. 2017)."""
@@ -504,6 +528,7 @@ def lissa_ihvp(model, params, loader, test_grad,
 inf_tr_loader = DataLoader(PerMoveDS(tr_idx, seqs_norm_full), batch_size=16,
                            shuffle=True, collate_fn=collate_permove)
 
+# ---------- Step 1: gradient for every training game ----------
 print('\n  Step 1/3: Training gradients (1400 games) ...')
 t0 = time.time()
 train_grads = []
@@ -519,7 +544,8 @@ for i, idx_i in enumerate(tr_idx):
 train_grads = np.array(train_grads)
 print(f'  Done in {time.time()-t0:.0f}s')
 
-# Select top-50 most suspicious test games
+# ---------- Step 2: LiSSA for top-50 suspicious test games ----------
+# Select the 50 test games the model is most suspicious about
 with torch.no_grad():
     test_scores = []
     for idx_j in te_idx:
@@ -548,6 +574,7 @@ for j, (loc_j, glob_j) in enumerate(zip(top50_local, top50_global)):
 print(f'  Influence matrix done in {time.time()-t1:.0f}s')
 print(f'  Range: [{influence_mat.min():.4f}, {influence_mat.max():.4f}]')
 
+# ---------- Step 3: self-influence I(z,z) for all training games ----------
 print('\n  Step 3/3: Self-influence (1400 train games) ...')
 self_inf = np.zeros(len(tr_idx))
 for i, idx_i in enumerate(tr_idx):
@@ -559,6 +586,10 @@ mean_cheat_si     = self_inf[tr_labels == 1].mean()
 mean_clean_si     = self_inf[tr_labels == 0].mean()
 print(f'  Self-inf  cheat={mean_cheat_si:.6f}  clean={mean_clean_si:.6f}  '
       f'ratio={mean_cheat_si/mean_clean_si:.1f}x')
+
+# =================================================================== #
+#                  END OF EXPLAINABILITY SECTION                      #
+# =================================================================== #
 
 # ─────────────────────────────────────────────────────────────────
 # 7. FIGURES
