@@ -1,5 +1,6 @@
 # Large data files
 *.xlsx
+!combined_features_labels.xlsx
 *.csv
 *.jsonl
 
