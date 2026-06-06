@@ -10,12 +10,7 @@
 *.pkl
 
 # Generated outputs
-*.docx
 *.pdf
-fig_*.png
-results_*.png
-model_comparison.png
-
 # Engine binaries
 stockfish/
 Lc0/
