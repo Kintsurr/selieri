@@ -1,4 +1,4 @@
-# hybrid_irwin_row_preserve.py
+# feature_extractor.py
 # One row per game (single sheet). Preserves all parameters:
 #   Per-move: Ply, MoveNo, Side, UCI, SAN, FEN_before, FEN_after, EMT_ms, ClkAfter_s
 #   For each engine (SF/LC0) and each depth (10/15/20):

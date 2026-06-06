@@ -15,7 +15,7 @@ Outputs:
   Selieri_v2.docx
 """
 
-import ast, json, warnings, time, random
+import ast, json, warnings, time, random, os
 import numpy as np
 import pandas as pd
 import matplotlib; matplotlib.use('Agg')
@@ -45,7 +45,13 @@ plt.rcParams.update({'figure.dpi': 150, 'font.size': 10})
 DEVICE = torch.device('cpu')
 SEED   = 42
 torch.manual_seed(SEED); np.random.seed(SEED); random.seed(SEED)
-BASE   = r'c:\Users\Zura\Desktop\Selieri'
+BASE   = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR    = os.path.join(BASE, 'data')          # input dataset
+RESULTS_DIR = os.path.join(BASE, 'results')       # all generated outputs
+MODELS_DIR  = os.path.join(RESULTS_DIR, 'models')
+FIG_DIR     = os.path.join(RESULTS_DIR, 'figures')
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(FIG_DIR, exist_ok=True)
 
 print('=' * 62)
 print('  SELIERI — Full Experiment Pipeline (4 models)')
@@ -55,7 +61,7 @@ print('=' * 62)
 # 1. LOAD & PREPARE DATA
 # ─────────────────────────────────────────────────────────────────
 print('\n[1] Loading data ...')
-df = pd.read_excel(f'{BASE}\\combined_features_labels.xlsx')
+df = pd.read_excel(f'{DATA_DIR}/combined_features_labels.xlsx')
 print(f'    Rows: {df.shape[0]}  Cols: {df.shape[1]}')
 
 def parse_array(s):
@@ -401,7 +407,7 @@ def save_model(model, path, n_feat, scaler, feat_cols, results):
         'results': {k: float(v) for k, v in results.items()
                     if k not in ('probs','preds','true','game_probs','game_preds','game_true')},
     }, path)
-    print(f'  Saved: {path.split(chr(92))[-1]}')
+    print(f'  Saved: {os.path.basename(path)}')
 
 # ─────────────────────────────────────────────────────────────────
 # 5. TRAIN ALL FOUR MODELS
@@ -415,7 +421,7 @@ A1 = CheatDetectorPerMove(n_features=N_FEAT_FULL).to(DEVICE)
 print(f'  Params: {sum(p.numel() for p in A1.parameters()):,}')
 hist_A1 = train_permove(A1, pm_tr_f, pm_va_f, pos_weight_move)
 res_A1  = eval_permove(A1, pm_te_f)
-save_model(A1, f'{BASE}\\selieri_model_permove_full.pt',
+save_model(A1, f'{MODELS_DIR}/selieri_model_permove_full.pt',
            N_FEAT_FULL, scaler_full, FEAT_COLS, res_A1)
 print(f'  Move AUC={res_A1["move_auc"]:.4f}  Game AUC={res_A1["game_auc"]:.4f}')
 
@@ -427,7 +433,7 @@ A2 = CheatDetectorPerMove(n_features=N_FEAT_SF).to(DEVICE)
 print(f'  Params: {sum(p.numel() for p in A2.parameters()):,}')
 hist_A2 = train_permove(A2, pm_tr_s, pm_va_s, pos_weight_move)
 res_A2  = eval_permove(A2, pm_te_s)
-save_model(A2, f'{BASE}\\selieri_model_permove_sfonly.pt',
+save_model(A2, f'{MODELS_DIR}/selieri_model_permove_sfonly.pt',
            N_FEAT_SF, scaler_sf, SF_COLS, res_A2)
 print(f'  Move AUC={res_A2["move_auc"]:.4f}  Game AUC={res_A2["game_auc"]:.4f}')
 
@@ -439,7 +445,7 @@ B1 = CheatDetectorGame(n_features=N_FEAT_FULL).to(DEVICE)
 print(f'  Params: {sum(p.numel() for p in B1.parameters()):,}')
 hist_B1 = train_game(B1, gm_tr_f, gm_va_f, pos_weight_game)
 res_B1  = eval_game(B1, gm_te_f)
-save_model(B1, f'{BASE}\\selieri_model_game_full.pt',
+save_model(B1, f'{MODELS_DIR}/selieri_model_game_full.pt',
            N_FEAT_FULL, scaler_full, FEAT_COLS, res_B1)
 print(f'  AUC={res_B1["auc"]:.4f}  F1={res_B1["f1"]:.4f}')
 
@@ -451,7 +457,7 @@ B2 = CheatDetectorGame(n_features=N_FEAT_SF).to(DEVICE)
 print(f'  Params: {sum(p.numel() for p in B2.parameters()):,}')
 hist_B2 = train_game(B2, gm_tr_s, gm_va_s, pos_weight_game)
 res_B2  = eval_game(B2, gm_te_s)
-save_model(B2, f'{BASE}\\selieri_model_game_sfonly.pt',
+save_model(B2, f'{MODELS_DIR}/selieri_model_game_sfonly.pt',
            N_FEAT_SF, scaler_sf, SF_COLS, res_B2)
 print(f'  AUC={res_B2["auc"]:.4f}  F1={res_B2["f1"]:.4f}')
 
@@ -612,7 +618,7 @@ LABELS = {
 }
 
 def savefig(name):
-    path = f'{BASE}\\{name}'
+    path = f'{FIG_DIR}/{name}'
     plt.savefig(path, dpi=150, bbox_inches='tight')
     plt.close('all')
     print(f'  Saved: {name}')
@@ -1220,7 +1226,7 @@ for ref in [
 ]:
     add_para(ref, size=9, space_after=4)
 
-out_path = f'{BASE}\\Selieri_v2.docx'
+out_path = f'{RESULTS_DIR}/Selieri_v2.docx'
 doc.save(out_path)
 print(f'  Saved: Selieri_v2.docx')
 

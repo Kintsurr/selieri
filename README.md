@@ -1,118 +1,109 @@
 # Selieri — Chess Cheating Detection with BiLSTM & Influence Functions
 
-Per-move and per-game chess cheating detection using Bidirectional LSTM networks trained on dual Stockfish + LC0/Maia engine features, with Koh & Liang (2017) influence function interpretability.
+Per-move and per-game chess cheating detection using Bidirectional LSTM networks trained on dual
+Stockfish + LC0/Maia engine features, with Koh & Liang (2017) influence-function interpretability.
 
-## Overview
+Built for the VUB *Current Trends* programming assignment.
 
-Four experimental conditions, all using identical BiLSTM architecture:
+## Quick start
 
-| Model | Task | Features | Game AUC |
-|-------|------|----------|----------|
-| A1 | Per-Move sequence labelling | SF + Maia (18) | ~0.986 |
-| A2 | Per-Move sequence labelling | SF-only (9) — control | ~0.980 |
-| B1 | Per-Game binary classification | SF + Maia (18) | ~0.995 |
-| B2 | Per-Game binary classification | SF-only (9) — control | ~0.990 |
+The single deliverable script is `anticheat_model.py`. It is self-contained — the dataset ships in
+`data/`, and it runs on **CPU only** (no GPU required).
 
-## Key Findings
+```bash
+pip install -r requirements.txt
+python anticheat_model.py          # or: python3 anticheat_model.py
+```
 
-- **Per-game models** outperform per-move on game-level F1 (direct objective, balanced classes)
-- **Adding LC0/Maia** features consistently improves both settings by capturing the "Cheater Zone" (low SF rank + high LC0 rank simultaneously)
-- **Per-move models** provide move-level suspicion scores — which specific moves were engine-assisted
-- **Koh & Liang influence functions** show cheat games carry ~5x higher self-influence than clean games
+This trains all four models, runs the influence analysis, and writes every output under `results/`
+(see below). A full run takes roughly **1.5–2 hours on CPU**; the Koh & Liang self-influence stage
+(Step 3/3) is the slow part. Everything is deterministic (`SEED = 42`).
 
-## The Cheater Zone Hypothesis
+## What it produces
 
-Engine-assisted moves tend to cluster in a distinct region:
-- **Low SF Rank** → objectively top engine choice
-- **High LC0 Rank** → a human-style network would NOT play this move
+| Output | Path |
+|--------|------|
+| Trained model weights (+ scaler) | `results/models/selieri_model_{permove,game}_{full,sfonly}.pt` |
+| 10 figures | `results/figures/fig_v2_*.png` |
+| Full write-up (paper) | `results/Selieri_v2.docx` |
 
-This dual-engine contrast is the core discriminative signal.
+## Results
+
+Four experimental conditions, all sharing one BiLSTM architecture. Numbers below were reproduced
+on Linux/CPU and match the saved checkpoints:
+
+| Model | Task | Features | Game AUC | Game F1 |
+|-------|------|----------|---------:|--------:|
+| A1 | Per-Move sequence labelling | SF + Maia (18) | 0.9839 | 0.8896 |
+| A2 | Per-Move sequence labelling | SF-only (9) — control | 0.9670 | 0.8433 |
+| B1 | Per-Game binary classification | SF + Maia (18) | **0.9940** | **0.9605** |
+| B2 | Per-Game binary classification | SF-only (9) — control | 0.9719 | 0.9115 |
+
+Koh & Liang self-influence: cheat games carry **4.2×** higher-magnitude self-influence than clean
+games. (See `docs/explainability_analysis.md` for a critical read of the influence results,
+including a known mismatch between the auto-generated `.docx` narrative and the figures.)
+
+**Key findings**
+
+- **Per-game models** beat per-move on the game-level objective (balanced classes, direct target).
+- **Adding LC0/Maia** features helps in both settings (ΔAUC ≈ +0.022 per-game, +0.017 per-move) by
+  capturing the *Cheater Zone* — moves that are top Stockfish picks yet human-unlikely.
+- **Per-move models** additionally yield move-level suspicion scores (which moves look engine-assisted).
+
+## The Cheater Zone hypothesis
+
+Engine-assisted moves cluster where **SF rank is low** (objectively the top engine move) but
+**LC0/Maia rank is high** (a human-style network would not play it). This dual-engine contrast is the
+core discriminative signal, and is why the SF-only models (A2, B2) serve as controls.
 
 ## Architecture
 
 ```
-Input: (B, T, 18) — sequence of move feature vectors
+Input: (B, T, 18) — sequence of per-move feature vectors
   └─ BiLSTM (2 layers, hidden=128, bidirectional) → (B, T, 256)
       ├─ Per-Move: Linear(256→64)→ReLU→Dropout→Linear(64→1) per timestep → (B, T)
       └─ Per-Game: MaskedMeanPool → (B, 256) → Linear(256→64)→ReLU→Dropout→Linear(64→1) → (B,)
 ```
 
-## Features (per move)
+**Features (per move).** 9 Stockfish-D20 metrics + the same 9 from LC0/Maia-D20:
+Rank, CPL, AdvWP, BestWP, WCL, Ambiguity05, difNextBest, difNextWorst, Sharpness.
 
-**Stockfish D20 (9 features):** Rank, CPL, AdvWP, BestWP, WCL, Ambiguity05, difNextBest, difNextWorst, Sharpness
+**Explainability.** Koh & Liang (2017) influence functions,
+`I(z_train, z_test) = -∇L(z_test)ᵀ H⁻¹ ∇L(z_train)`, with `H⁻¹v` approximated by LiSSA
+(Agarwal et al. 2017) restricted to the classifier head (16,513 params) for tractable CPU compute.
 
-**LC0/Maia D20 (9 features):** Same metrics from the neural network engine
-
-## Explainability
-
-Implements **Koh & Liang (2017)** influence functions:
-
-```
-I(z_train, z_test) = -∇L(z_test)ᵀ H⁻¹ ∇L(z_train)
-```
-
-H⁻¹v approximated via **LiSSA** (stochastic second-order, Agarwal et al. 2017), restricted to the classifier head (16,513 parameters) for tractable CPU computation.
-
-## Project Structure
+## Project layout
 
 ```
-run_all_experiments.py    # Main pipeline — trains all 4 models + influence + paper
-train_per_move.py         # Standalone per-move training script
-influence_analysis.py     # TracIn-style influence analysis (earlier version)
-generate_paper.py         # Earlier paper generator (superseded by run_all_experiments.py)
-merge_batch1_batch2.py    # Merges batch1 + batch2 feature/label files
-merge_batch1.py           # Merges raw features with labels for batch1
-process_all_batches.py    # Feature extraction pipeline (Stockfish + LC0)
-raw data.py               # Game simulation script
-irwin hybrid.py           # Feature extraction worker
+anticheat_model.py     # THE deliverable — trains 4 models + influence + figures + paper
+requirements.txt       # dependencies (CPU only)
+data/
+  combined_features_labels.xlsx   # 2,000 games · 193,074 moves (input dataset)
+results/               # all generated outputs (created on run)
+  models/  figures/  Selieri_v2.docx
+docs/
+  explainability_analysis.md              # critical analysis of the influence results
+  current_trends_assignment_description.pdf
+papers/                # the two reference papers (Koh & Liang; Pruthi et al. TracIn)
+pipeline/              # data-generation scripts (see note below)
+  data_generator.py    # simulate Maia-vs-Maia games, inject Stockfish "cheat" moves
+  feature_extractor.py # per-move SF+LC0 features at depths 10/15/20, one row per game
+  data_processor.py    # orchestrator: discover batches → extract → merge → unify
+  data_merger.py       # merge features↔labels, then combine batches
 ```
 
-## Data Pipeline
+### Note on `pipeline/`
+
+These scripts produced `data/combined_features_labels.xlsx` and are included for completeness. They
+were run on **Windows** and require local **Stockfish** and **LC0/Maia** engine binaries, so they do
+**not** run on a stock Linux machine. You do **not** need them to reproduce the results — the dataset
+is already shipped in `data/`. Pipeline order (for reference):
 
 ```
-raw data.py  →  sim_games/batch*.pgn + batch*.xlsx
-     ↓
-process_all_batches.py  →  batch1_features.xlsx, batch2_features.xlsx
-     ↓
-merge_batch1.py / merge_batch1_batch2.py  →  combined_features_labels.xlsx
-     ↓
-run_all_experiments.py  →  models + figures + Selieri_v2.docx
+data_generator.py  →  sim_games/batchN.pgn + batchN.xlsx
+feature_extractor.py  →  batchN.xlsx (features)
+data_merger.py  →  data/combined_features_labels.xlsx
 ```
-
-## Requirements
-
-```
-torch
-pandas
-numpy
-scikit-learn
-matplotlib
-seaborn
-openpyxl
-python-docx
-```
-
-## Usage
-
-```bash
-# Run full pipeline (trains all 4 models, influence analysis, generates paper)
-python run_all_experiments.py
-
-# Run just the per-move model
-python train_per_move.py
-
-# Run TracIn influence analysis (earlier implementation)
-python influence_analysis.py
-```
-
-## Output Files
-
-- `selieri_model_permove_full.pt` — A1 model weights + scaler
-- `selieri_model_permove_sfonly.pt` — A2 model weights + scaler
-- `selieri_model_game_full.pt` — B1 model weights + scaler
-- `selieri_model_game_sfonly.pt` — B2 model weights + scaler
-- `fig_v2_*.png` — 10 figures
-- `Selieri_v2.docx` — Full scientific paper
 
 ## References
 

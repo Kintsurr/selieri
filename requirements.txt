@@ -1,0 +1,25 @@
+# Selieri — Python dependencies
+#
+# Required to run the deliverable, anticheat_model.py.
+# Tested on Python 3.12, CPU only (no GPU/CUDA required).
+# Install with:  pip install -r requirements.txt
+#
+# Versions below are what this was tested against; they are left unpinned so pip
+# can resolve a compatible set on your machine. For torch, the default CPU wheel
+# is sufficient — do not install a CUDA-specific build.
+
+torch          # tested 2.12.0
+pandas         # tested 2.1.4
+numpy          # tested 1.26.4
+scikit-learn   # tested 1.4.1
+matplotlib     # tested 3.6.3
+seaborn        # tested 0.13.2
+openpyxl       # tested 3.1.2   (reads data/combined_features_labels.xlsx)
+python-docx    # tested 1.2.0   (writes results/Selieri_v2.docx)
+
+# ---------------------------------------------------------------------------
+# Data-generation pipeline only (pipeline/*.py) — NOT needed for the deliverable.
+# Those scripts additionally require local Stockfish + LC0 engine binaries and
+# were run on Windows; they will not run on a stock Linux box without the engines.
+#   python-chess
+#   tqdm

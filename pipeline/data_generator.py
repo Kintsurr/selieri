@@ -94,16 +94,16 @@ def configure_lc0(eng):
         try: eng.configure({opt: True})
         except: pass
     try: eng.configure({"Threads": 2, "MultiPV": max(3, MULTIPV)})
-    except: pass
+    except Exception as e: dbg(f"[WARN] LC0 configure(Threads/MultiPV) failed: {e}")
     try: eng.ping()
-    except: pass
+    except Exception as e: dbg(f"[WARN] LC0 ping failed: {e}")
     return eng
 
 def configure_sf(eng):
     try: eng.configure({"Threads": 2, "Hash": 256, "UCI_ShowWDL": True})
-    except: pass
+    except Exception as e: dbg(f"[WARN] SF configure failed: {e}")
     try: eng.ping()
-    except: pass
+    except Exception as e: dbg(f"[WARN] SF ping failed: {e}")
     return eng
 
 def pov_cp(info_or_score, pov_color):
@@ -166,7 +166,8 @@ def analyse_multipv(engine, board, t, multipv):
             wdl = info_wdl_tuple(info, board.turn)
             if mv and mv not in seen:
                 out.append((mv, cp, wdl, pv)); seen.add(mv)
-    except Exception:
+    except Exception as e:
+        dbg(f"[WARN] analyse_multipv: engine.analyse failed: {e}")
         out = []
     if not out:
         try:
@@ -179,7 +180,8 @@ def analyse_multipv(engine, board, t, multipv):
                         pv = quick["pv"]
                 except Exception: pass
                 out = [(r.move, 0, None, pv)]
-        except Exception: pass
+        except Exception as e:
+            dbg(f"[WARN] analyse_multipv: play fallback failed: {e}")
     return out
 
 def sample_weighted(options):
@@ -489,7 +491,8 @@ def stockfish_move(sf, board):
     try:
         r = sf.play(board, chess.engine.Limit(time=SF_MOVE_TIME))
         return r.move if r else None
-    except:
+    except Exception as e:
+        dbg(f"[WARN] stockfish_move: sf.play failed ({e}); choosing random legal move")
         ms = list(board.legal_moves)
         return random.choice(ms) if ms else None
 

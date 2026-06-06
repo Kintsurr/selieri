@@ -26,7 +26,7 @@ import pandas as pd
 # ─────────────────────────────────────────────
 ROOT      = Path(__file__).parent.resolve()          # c:\...\Selieri
 SIM_DIR   = ROOT / "sim_games"
-IRWIN     = ROOT / "irwin hybrid.py"                 # file with a space in the name
+IRWIN     = ROOT / "feature_extractor.py"            # per-move SF+LC0 feature extractor
 LOG_FILE  = ROOT / "processing_log.txt"
 UNIFIED   = ROOT / "unified_features_labels.xlsx"
 
